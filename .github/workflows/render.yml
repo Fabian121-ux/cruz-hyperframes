@@ -1,91 +1,26 @@
-name: Render Cruz with HyperFrames
-
+name: Inspect Quote source
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - "*.mp4"
-      - "scripts/**"
-      - ".github/workflows/render.yml"
-
+    paths: ["Quote.mp4", ".github/workflows/render.yml"]
+permissions:
+  contents: read
 jobs:
-  render:
+  inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-    permissions:
-      contents: read
-
+    timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Find uploaded video
-        shell: bash
-        run: |
-          VIDEO="$(find . -maxdepth 1 -type f -name '*.mp4' | head -n 1)"
-          if [ -z "$VIDEO" ]; then
-            echo "No MP4 found in repository root."
-            exit 1
-          fi
-          echo "VIDEO=$VIDEO" >> "$GITHUB_ENV"
-          echo "Using $VIDEO"
-
-      - name: Install system dependencies
-        shell: bash
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg cmake build-essential
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
-          google-chrome --version || chromium --version || true
-
-      - name: Install HyperFrames
-        shell: bash
+          sudo apt-get install -y ffmpeg
+      - name: Inspect only Quote.mp4
         run: |
-          npm init -y >/dev/null 2>&1
-          if ! npm install --no-audit --no-fund hyperframes@0.8.4; then
-            npm install --no-audit --no-fund @hyperframes/cli@0.8.4
-          fi
-          ./node_modules/.bin/hyperframes --version
-
-      - name: Transcribe dialogue for captions
-        continue-on-error: true
-        shell: bash
-        run: |
-          ./node_modules/.bin/hyperframes transcribe "$VIDEO"             --model tiny.en             --language en             --dir .             --timeout 900000
-
-      - name: Build content-aware composition
-        shell: bash
-        run: |
-          node scripts/build-composition.mjs "$VIDEO"
-          ls -lh index.html transcript.json 2>/dev/null || true
-
-      - name: Lint composition
-        continue-on-error: true
-        shell: bash
-        run: |
-          ./node_modules/.bin/hyperframes lint .
-
-      - name: Render edited MP4
-        shell: bash
-        run: |
-          mkdir -p renders
-          ./node_modules/.bin/hyperframes render .             --output renders/cruz-edited.mp4             --quality high             --workers 2             --no-browser-gpu
-
-      - name: Upload render and diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cruz-hyperframes-render
-          path: |
-            renders/cruz-edited.mp4
-            index.html
-            transcript.json
-          if-no-files-found: warn
-          retention-days: 7
+          test -s Quote.mp4
+          ffprobe -v error -count_frames -show_streams -show_format -of json Quote.mp4
+          mkdir -p inspection
+          ffmpeg -hide_banner -loglevel error -i Quote.mp4 -vf "scale=320:180,tile=7x3" -frames:v 1 inspection/source-sheet.jpg
+          ffmpeg -hide_banner -loglevel error -sseof -0.09 -i Quote.mp4 -frames:v 1 inspection/source-final.jpg
+          node --input-type=module -e 'import fs from "node:fs"; for(const name of ["source-sheet","source-final"]) console.log("IMAGE_"+name+":"+fs.readFileSync("inspection/"+name+".jpg").toString("base64"));'
