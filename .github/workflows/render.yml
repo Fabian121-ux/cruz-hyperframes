@@ -30,11 +30,11 @@ jobs:
         run: |
           test -s Quote.mp4
           echo "VIDEO=Quote.mp4" >> "$GITHUB_ENV"
-          ffprobe -v error -show_streams -show_format -of json Quote.mp4
       - name: Install FFmpeg and raster layer tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg python3-pil
+          ffprobe -v error -show_streams -show_format -of json Quote.mp4
       - name: Install pinned HyperFrames
         run: |
           npm init -y >/dev/null 2>&1
