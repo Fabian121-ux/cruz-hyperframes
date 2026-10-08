@@ -12,7 +12,7 @@ permissions:
   contents: read
 concurrency:
   group: quote-enhanced-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -45,6 +45,7 @@ jobs:
       - name: Build editable quote composition
         run: node scripts/build-composition.mjs "$VIDEO"
       - name: Preview and verify frame-driven motion and exact quotation
+        timeout-minutes: 3
         run: node scripts/preview-quote.mjs
       - name: Lint composition
         run: ./node_modules/.bin/hyperframes lint .

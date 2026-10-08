@@ -14,13 +14,15 @@ const server=http.createServer((req,res)=>{
  res.end(fs.readFileSync(file));
 });
 await new Promise(resolve=>server.listen(8123,"127.0.0.1",resolve));
-const browser=await puppeteer.launch({executablePath:"/usr/bin/google-chrome",headless:true,args:["--no-sandbox","--disable-dev-shm-usage"]});
+const browser=await puppeteer.launch({executablePath:"/usr/bin/google-chrome",headless:true,protocolTimeout:30000,args:["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"]});
 try{
  const page=await browser.newPage();
  await page.setViewport({width:1920,height:1080,deviceScaleFactor:1});
- await page.goto("http://127.0.0.1:8123",{waitUntil:"networkidle0"});
+ console.log("PREVIEW_BROWSER_READY");
+ await page.goto("http://127.0.0.1:8123",{waitUntil:"networkidle0",timeout:30000});
  await page.waitForFunction(()=>window.__timelines?.main && [...document.images].every(i=>i.complete && i.naturalWidth>0));
  await page.evaluate(()=>document.fonts.ready);
+ console.log("PREVIEW_ASSETS_READY");
  const report=await page.evaluate(()=>{
    const cfg=window.__quoteConfig,tl=window.__timelines.main;
    const quote=[...document.querySelectorAll(".word")].map(x=>x.textContent).join(" ");
@@ -53,10 +55,6 @@ try{
  console.log("CONTINUITY_MEASUREMENTS", JSON.stringify({maxMove,maxScale,maxArm,firstFrames:report.states.slice(0,3)}));
  assert.ok(maxMove<3 && maxScale<.003 && maxArm<.3,"Camera or arm movement jumps between frames");
  fs.mkdirSync("renders/preview",{recursive:true});
- for(const t of [0,.5,1,1.5,2,2.5,3,3.5,4.9666667]){
-   await page.evaluate(t=>window.__timelines.main.totalTime(t,false),t);
-   await page.screenshot({path:"renders/preview/time-"+t.toFixed(3)+".png"});
- }
  fs.writeFileSync("renders/preview-validation.json",JSON.stringify({quote:report.quote,emphasis:report.emphasis,maxCameraPixelsPerFrame:maxMove,maxScalePerFrame:maxScale,maxArmDegreesPerFrame:maxArm,words:report.words},null,2));
  console.log("PREVIEW_VERIFIED",JSON.stringify({quote:report.quote,words:report.words.length,maxMove,maxScale,maxArm}));
-}finally{await browser.close();server.close();}
+}finally{await browser.close();server.closeAllConnections();server.close();}
