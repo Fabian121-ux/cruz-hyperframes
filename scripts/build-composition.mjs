@@ -46,7 +46,7 @@ function extractWords() {
     const raw = JSON.parse(readFileSync("transcript.json", "utf8"));
     const words = [];
     // HyperFrames emits normalized word timestamps in seconds.
-    for (const word of raw.words ?? []) {
+    for (const word of (Array.isArray(raw) ? raw : raw.words ?? [])) {
       const text = String(word.text ?? word.word ?? "").trim();
       const start = Number(word.start);
       const end = Number(word.end);
