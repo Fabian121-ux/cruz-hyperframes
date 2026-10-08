@@ -1,9 +1,9 @@
-name: Render Cruz with HyperFrames
+name: Test captions and zooms with HyperFrames
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [codex/render-test-2026-10-08]
     paths:
       - "*.mp4"
       - "scripts/**"
@@ -64,7 +64,8 @@ jobs:
         shell: bash
         run: |
           node scripts/build-composition.mjs "$VIDEO"
-          ls -lh index.html transcript.json 2>/dev/null || true
+          cat transcript.json
+          cat edit-report.json
 
       - name: Lint composition
         continue-on-error: true
@@ -78,13 +79,21 @@ jobs:
           mkdir -p renders
           ./node_modules/.bin/hyperframes render .             --output renders/cruz-edited.mp4             --quality high             --workers 2             --no-browser-gpu
 
+      - name: Verify rendered video and make preview
+        shell: bash
+        run: |
+          ffprobe -v error -show_streams -show_format -of json renders/cruz-edited.mp4 > renders/probe.json
+          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("renders/probe.json")); const e=JSON.parse(fs.readFileSync("edit-report.json")); if(!p.streams.some(s=>s.codec_type==="video") || !p.streams.some(s=>s.codec_type==="audio") || Math.abs(Number(p.format.duration)-e.duration)>0.2 || e.captions<1 || e.zooms<1) throw Error("Render verification failed"); console.log("VERIFIED", JSON.stringify(e));'
+          ffmpeg -hide_banner -loglevel error -i renders/cruz-edited.mp4 -vf "fps=1,scale=270:-1,tile=4x3" -frames:v 1 renders/preview.jpg
+
       - name: Upload render and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cruz-hyperframes-render
+          name: cruz-captions-zoom-test
           path: |
-            renders/cruz-edited.mp4
+            renders/
+            edit-report.json
             index.html
             transcript.json
           if-no-files-found: warn

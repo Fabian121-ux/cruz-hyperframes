@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -29,33 +29,15 @@ function ffprobeJson() {
 }
 
 function detectSceneCuts() {
-  try {
-    execFileSync(
-      "ffmpeg",
-      [
-        "-hide_banner",
-        "-i",
-        videoPath,
-        "-filter:v",
-        "select=gt(scene\\,0.34),showinfo",
-        "-f",
-        "null",
-        "-",
-      ],
-      { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"] },
-    );
-    return [];
-  } catch (err) {
-    const stderr = String(err?.stderr ?? "");
-    const times = [];
-    const re = /pts_time:([0-9.]+)/g;
-    let m;
-    while ((m = re.exec(stderr)) !== null) {
-      const t = Number(m[1]);
-      if (Number.isFinite(t) && t > 0.15) times.push(t);
-    }
-    return [...new Set(times.map((t) => Number(t.toFixed(3))))];
+  const result = spawnSync("ffmpeg", [
+    "-hide_banner", "-i", videoPath, "-filter:v",
+    "select=gt(scene\\,0.34),showinfo", "-f", "null", "-"
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  if (result.error || result.status !== 0) {
+    throw new Error("Scene detection failed: " + (result.error?.message || result.stderr));
   }
+  return [...new Set([...String(result.stderr).matchAll(/pts_time:([0-9.]+)/g)]
+    .map((m) => Number(Number(m[1]).toFixed(3))).filter((t) => t > 0.15))];
 }
 
 function extractWords() {
@@ -63,6 +45,17 @@ function extractWords() {
   try {
     const raw = JSON.parse(readFileSync("transcript.json", "utf8"));
     const words = [];
+    // HyperFrames emits normalized word timestamps in seconds.
+    for (const word of raw.words ?? []) {
+      const text = String(word.text ?? word.word ?? "").trim();
+      const start = Number(word.start);
+      const end = Number(word.end);
+      if (text && Number.isFinite(start) && Number.isFinite(end) && end > start) {
+        words.push({ text, start, end });
+      }
+    }
+    if (words.length) return words;
+    // Also accept the native whisper.cpp token format.
     for (const seg of raw.transcription ?? []) {
       for (const token of seg.tokens ?? []) {
         const text = String(token.text ?? "").trim();
@@ -132,6 +125,8 @@ const renderFps = Number.isFinite(fps) && fps >= 1 ? Math.min(60, Math.max(24, M
 
 const words = extractWords();
 const cues = cueWords(words);
+if (!cues.length) throw new Error("No captions generated; inspect transcript.json.");
+const zoomCues = cues.filter((cue, i) => /[!?]$/.test(cue.text) || i % 3 === 0);
 const sceneCuts = detectSceneCuts().filter((t) => t < duration - 0.15);
 
 const captionsHtml = cues
@@ -263,7 +258,7 @@ const html = `<!doctype html>
         Math.max(start + 0.28, end - 0.09)
       );
 
-      if (/[!?]$/.test(cue.text)) {
+      if (/[!?]$/.test(cue.text) || i % 3 === 0) {
         tl.to("#a-roll", { scale: 1.045, duration: 0.10, ease: "power2.out" }, start);
         tl.to("#a-roll", { scale: 1, duration: 0.16, ease: "power2.out" }, start + 0.10);
       }
@@ -283,6 +278,7 @@ const html = `<!doctype html>
 </html>`;
 
 writeFileSync("index.html", html);
+writeFileSync("edit-report.json", JSON.stringify({ captions: cues.length, zooms: zoomCues.length, sceneCuts: sceneCuts.length, duration, width, height, fps: renderFps }, null, 2));
 console.log(
   JSON.stringify(
     {
@@ -293,6 +289,7 @@ console.log(
       fps: renderFps,
       captions: cues.length,
       sceneCuts: sceneCuts.length,
+      zooms: zoomCues.length,
     },
     null,
     2,
