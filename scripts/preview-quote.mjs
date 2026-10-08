@@ -50,6 +50,7 @@ try{
    maxScale=Math.max(maxScale,Math.abs(b.scale-a.scale));
    maxArm=Math.max(maxArm,Math.abs(b.arm-a.arm));
  }
+ console.log("CONTINUITY_MEASUREMENTS", JSON.stringify({maxMove,maxScale,maxArm,firstFrames:report.states.slice(0,3)}));
  assert.ok(maxMove<3 && maxScale<.003 && maxArm<.3,"Camera or arm movement jumps between frames");
  fs.mkdirSync("renders/preview",{recursive:true});
  for(const t of [0,.5,1,1.5,2,2.5,3,3.5,4.9666667]){

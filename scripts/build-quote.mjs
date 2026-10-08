@@ -36,7 +36,7 @@ const html = `<!doctype html>
 #camera{position:absolute;inset:0;transform-origin:0 0;will-change:transform}
 #character{position:absolute;left:${c.x}px;top:${c.y}px;width:948px;height:1080px;transform:scale(${c.scale});transform-origin:0 0}
 #body,#arm{position:absolute;left:0;top:0;width:948px;height:1080px;object-fit:contain}
-#body{z-index:1}#arm{z-index:2;transform-origin:${c.armPivot[0]}px ${c.armPivot[1]}px}
+#body{z-index:1}#arm{z-index:2;transform:rotate(${c.initialArmAngle}deg);transform-origin:${c.armPivot[0]}px ${c.armPivot[1]}px}
 #quote{position:absolute;left:${t.x}px;top:${t.y}px;width:${t.width}px;color:#fafafa;font-family:Arial,Helvetica,sans-serif;font-size:${t.fontSize}px;line-height:${t.lineHeight};font-weight:800;letter-spacing:-1.4px}
 #opening-mark{position:absolute;left:-5px;top:-74px;color:${cfg.accent};font-size:146px;line-height:1;font-weight:900;opacity:0}
 #top-rule{position:absolute;left:106px;right:8px;top:12px;height:4px;background:${cfg.accent};transform-origin:left center;opacity:0}
