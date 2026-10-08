@@ -22,5 +22,5 @@ jobs:
           ffprobe -v error -count_frames -show_streams -show_format -of json Quote.mp4
           mkdir -p inspection
           ffmpeg -hide_banner -loglevel error -i Quote.mp4 -vf "scale=320:180,tile=7x3" -frames:v 1 inspection/source-sheet.jpg
-          ffmpeg -hide_banner -loglevel error -sseof -0.09 -i Quote.mp4 -frames:v 1 inspection/source-final.jpg
+          ffmpeg -hide_banner -loglevel error -i Quote.mp4 -vf "select=eq(n\\,12)" -frames:v 1 inspection/source-final.jpg
           node --input-type=module -e 'import fs from "node:fs"; for(const name of ["source-sheet","source-final"]) console.log("IMAGE_"+name+":"+fs.readFileSync("inspection/"+name+".jpg").toString("base64"));'
