@@ -1,30 +1,21 @@
 # Cruz HyperFrames
 
-This repository renders the uploaded Cruz MP4 through HyperFrames using GitHub Actions.
+Quote.mp4 is enhanced through the existing HyperFrames, GSAP, FFmpeg, and GitHub Actions pipeline. The workflow explicitly selects Quote.mp4, never another MP4.
 
-## Current automatic edit pass
+## Editable animation
+- `quote.config.json`: exact quotation, text layout, camera keyframes, duration and original pose selection.
+- `scripts/prepare-quote.py`: separates the original character and pointing arm, removing baked text and source arm trails.
+- `scripts/build-composition.mjs`: existing entry point; dispatches Quote.mp4 to `scripts/build-quote.mjs`.
+- `scripts/build-quote.mjs`: deterministic GSAP composition with eased shoulder movement, camera motion and independent word layers.
+- `scripts/preview-quote.mjs`: browser previews, exact text, blue emphasis, readability and per-frame continuity checks.
+- `scripts/verify-quote.mjs`: complete MP4 decode, dimensions, frame rate, frame count, duration and source audio checks.
 
-The workflow:
+The 1.75-second source contains 21 decoded poses at 12 FPS and no audio. This edit uses its original pointing artwork as separate raster layers, rather than manufacturing optical-flow poses or repeating the abrupt final transition. Generated layers and HTML remain available in the workflow's review diagnostics.
 
-- detects the uploaded MP4 automatically;
-- installs FFmpeg and HyperFrames on a GitHub runner;
-- transcribes English dialogue with HyperFrames/whisper.cpp when available;
-- creates animated pop-up captions from word timestamps;
-- detects visual scene cuts with FFmpeg;
-- adds restrained flash/zoom emphasis at detected cuts;
-- adds small punch zooms on emphatic caption lines;
-- preserves the original video and original audio;
-- renders a high-quality MP4;
-- uploads the finished render as a GitHub Actions artifact named `cruz-hyperframes-render`.
+## Timeline
+0–1s gentle character zoom; 1–2s eased pointing gesture and camera follow; 2–3.5s progressive quotation reveal; 3.5–5s readable hold with a subtle push-in.
 
-This is the first technical pass. Meme/reaction overlays and hand-tuned comedic effects should be added after we inspect the transcript and first render instead of inserting random memes blindly.
+## Delivery
+The workflow renders `Quote-Enhanced.mp4` at 1920x1080, 30 FPS, H.264 with fast-start metadata. A separate publishing job receives only that verified MP4 and has `contents: write`; rendering has only `contents: read`. It publishes an individual GitHub Release video asset, downloads it without authentication, and compares the downloaded bytes to the verified render.
 
-## Input
-
-The current uploaded source video is:
-
-`093001_1790756792421.mp4`
-
-## Output
-
-After the workflow finishes, open the repository's **Actions** tab, open the latest **Render Cruz with HyperFrames** run, then download the **cruz-hyperframes-render** artifact.
+The original generic builder is retained for other videos, but the Quote workflow does not select or render them.

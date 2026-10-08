@@ -1,26 +1,108 @@
-name: Inspect Quote source
+name: Render and publish Quote Enhanced
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["Quote.mp4", ".github/workflows/render.yml"]
+    paths:
+      - "Quote.mp4"
+      - "quote.config.json"
+      - "scripts/**"
+      - ".github/workflows/render.yml"
 permissions:
   contents: read
+concurrency:
+  group: quote-enhanced-main
+  cancel-in-progress: false
 jobs:
-  inspect:
+  render:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 35
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - name: Install FFmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-      - name: Inspect only Quote.mp4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Select only Quote.mp4
         run: |
           test -s Quote.mp4
-          ffprobe -v error -count_frames -show_streams -show_format -of json Quote.mp4
-          mkdir -p inspection
-          ffmpeg -hide_banner -loglevel error -i Quote.mp4 -vf "scale=320:180,tile=7x3" -frames:v 1 inspection/source-sheet.jpg
-          ffmpeg -hide_banner -loglevel error -i Quote.mp4 -vf "select=eq(n\\,12)" -frames:v 1 inspection/source-final.jpg
-          node --input-type=module -e 'import fs from "node:fs"; for(const name of ["source-sheet","source-final"]) console.log("IMAGE_"+name+":"+fs.readFileSync("inspection/"+name+".jpg").toString("base64"));'
+          echo "VIDEO=Quote.mp4" >> "$GITHUB_ENV"
+          ffprobe -v error -show_streams -show_format -of json Quote.mp4
+      - name: Install FFmpeg and raster layer tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg python3-pil
+      - name: Install pinned HyperFrames
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund hyperframes@0.8.4 puppeteer-core@24.25.0
+          ./node_modules/.bin/hyperframes --version
+      - name: Prepare the original character layers
+        run: python3 scripts/prepare-quote.py
+      - name: Build editable quote composition
+        run: node scripts/build-composition.mjs "$VIDEO"
+      - name: Preview and verify frame-driven motion and exact quotation
+        run: node scripts/preview-quote.mjs
+      - name: Lint composition
+        run: ./node_modules/.bin/hyperframes lint .
+      - name: Render through existing HyperFrames pipeline
+        run: |
+          mkdir -p renders
+          ./node_modules/.bin/hyperframes render . --output renders/hyperframes-quote.mp4 --quality high --workers 2 --no-browser-gpu
+      - name: Encode delivery H.264 and preserve source audio if present
+        run: |
+          ffmpeg -y -hide_banner -loglevel error -i renders/hyperframes-quote.mp4 -i Quote.mp4 -map 0:v:0 -map '1:a:0?' -af apad -t 5 -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -movflags +faststart renders/Quote-Enhanced.mp4
+      - name: Decode and verify finished MP4
+        run: node scripts/verify-quote.mjs
+      - name: Transfer only the finished MP4 to the publisher
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quote-Enhanced-mp4
+          path: renders/Quote-Enhanced.mp4
+          if-no-files-found: error
+          retention-days: 7
+      - name: Keep editable composition and review frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quote-review
+          path: |
+            index.html
+            quote-assets/
+            quote-edit-report.json
+            renders/preview/
+            renders/*validation.json
+            renders/render-*.jpg
+          retention-days: 7
+          if-no-files-found: warn
+  publish:
+    needs: render
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download the verified individual MP4
+        uses: actions/download-artifact@v4
+        with:
+          name: Quote-Enhanced-mp4
+          path: renders
+      - name: Publish individual Release asset and verify public download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: quote-enhanced-${{ github.run_id }}-${{ github.run_attempt }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          test -s renders/Quote-Enhanced.mp4
+          gh release create "$RELEASE_TAG" "renders/Quote-Enhanced.mp4#Quote-Enhanced.mp4" --target "$TARGET_SHA" --title "Quote Enhanced" --notes "Cinematic 5-second animation. 1920x1080, 30 FPS, H.264. Original cartoon character; independently animated quotation."
+          DOWNLOAD_URL="https://github.com/$GH_REPO/releases/download/$RELEASE_TAG/Quote-Enhanced.mp4"
+          curl --fail --location --retry 4 --retry-delay 3 "$DOWNLOAD_URL" --output downloaded-Quote-Enhanced.mp4
+          cmp renders/Quote-Enhanced.mp4 downloaded-Quote-Enhanced.mp4
+          test -s downloaded-Quote-Enhanced.mp4
+          echo "DIRECT_MP4_VERIFIED=$DOWNLOAD_URL"
+          echo "$DOWNLOAD_URL" >> "$GITHUB_STEP_SUMMARY"

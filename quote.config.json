@@ -1,0 +1,73 @@
+{
+  "source": "Quote.mp4",
+  "duration": 5,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "poseFrame": 12,
+  "quote": "There are two main human sins from which all the others derive: impatience and indolence.",
+  "lines": [
+    "There are two main human",
+    "sins from which all the",
+    "others derive:",
+    "impatience",
+    "and indolence."
+  ],
+  "accent": "#078eff",
+  "character": {
+    "x": 30,
+    "y": 10,
+    "scale": 0.94,
+    "armPivot": [
+      422,
+      402
+    ],
+    "initialArmAngle": -3.8
+  },
+  "text": {
+    "x": 960,
+    "y": 188,
+    "width": 860,
+    "fontSize": 58,
+    "emphasisSize": 94,
+    "lineHeight": 1.23
+  },
+  "camera": [
+    {
+      "time": 0,
+      "x": 0,
+      "y": 0,
+      "scale": 1
+    },
+    {
+      "time": 1,
+      "x": 10,
+      "y": -14,
+      "scale": 1.045
+    },
+    {
+      "time": 2,
+      "x": -28,
+      "y": -9,
+      "scale": 1.035
+    },
+    {
+      "time": 3.5,
+      "x": -55,
+      "y": -18,
+      "scale": 1.045
+    },
+    {
+      "time": 5,
+      "x": -65,
+      "y": -22,
+      "scale": 1.055
+    }
+  ],
+  "reveal": {
+    "start": 2,
+    "end": 3.5,
+    "fade": 0.26
+  },
+  "output": "Quote-Enhanced.mp4"
+}

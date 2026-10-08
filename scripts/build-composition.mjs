@@ -11,6 +11,12 @@ if (!videoArg) {
 const videoPath = path.resolve(videoArg);
 const videoFile = path.basename(videoPath);
 
+// Quote uses original character layers and an independently authored quotation.
+if (videoFile === "Quote.mp4") {
+  await import("./build-quote.mjs");
+  process.exit(0);
+}
+
 function ffprobeJson() {
   const out = execFileSync(
     "ffprobe",
